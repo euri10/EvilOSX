@@ -4,7 +4,6 @@
 # Random Hash: This text will be replaced when building EvilOSX.
 __author__ = "Marten4n6"
 __license__ = "GPLv3"
-__version__ = "1.1.0"
 
 import time
 import urllib2

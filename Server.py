@@ -6,7 +6,6 @@ Provides only the communication layer, all other functionality is handled by mod
 """
 __author__ = "Marten4n6"
 __license__ = "GPLv3"
-__version__ = "1.1.0"
 
 import threading
 import sqlite3
@@ -29,8 +28,8 @@ BANNER = """\
  | |__ __   __ _ | || |  | || (___   \ V / 
  |  __|\ \ / /| || || |  | | \___ \   > <  
  | |____\ V / | || || |__| | ____) | / . \ 
- |______|\_/  |_||_| \____/ |_____/ /_/ \_\\ v{0}
-""".format(__version__)
+ |______|\_/  |_||_| \____/ |_____/ /_/ \_\\ @{0}
+""".format(__author__)
 
 MESSAGE_INPUT = "\033[1m" + "[?] " + "\033[0m"
 MESSAGE_INFO = "\033[94m" + "[I] " + "\033[0m"
