@@ -16,21 +16,22 @@ class Module:
         
         
         def get_model():
-            model_key = run_command("sysctl hw.model").split(": ")[1]
+            output = run_command("sysctl hw.model")
             
-            if not model_key:
+            if output:
+                model_key = output.split(":")[1].replace("\\n", "").replace(" ", "")
+            else:
                 model_key = "Macintosh"
                 
-            model = run_command("/usr/libexec/PlistBuddy -c 'Print :\\"{0}\\"' /System/Library/PrivateFrameworks/ServerInformation.framework/Versions/A/Resources/English.lproj/SIMachineAttributes.plist | grep marketingModel".format(model_key))
-            model = model.split("= ")[1]
-            return model
-            
-            
+            output = run_command("/usr/libexec/PlistBuddy -c 'Print :\\"%s\\"' /System/Library/PrivateFrameworks/ServerInformation.framework/Versions/A/Resources/English.lproj/SIMachineAttributes.plist | grep marketingModel" % model_key)
+            return output.split("=")[1][1:]
+        
+        
         def get_wifi():
             command = "/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport -I | grep -w SSID"
             return run_command(command).split("SSID: ")[1]
-            
-            
+        
+        
         battery = run_command("pmset -g batt | egrep \\"([0-9]+\\%).*\\" -o | cut -f1 -d\';\'")
         
         print MESSAGE_INFO + "System version: {0}".format(str(platform.mac_ver()[0]))
