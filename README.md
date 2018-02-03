@@ -31,6 +31,7 @@
 - Persistent
 - Simple extendable [module](https://github.com/Marten4n6/EvilOSX/blob/master/modules/template.py) system
 - Retrieve Chrome passwords
+- Download and upload files
 - Attempt to get root via local privilege escalation
 - Auto installer, simply run EvilOSX on your target and the rest is handled automatically.
 
