@@ -122,7 +122,7 @@ def _get_random_user_agent():
     return random.choice(user_agents)
 
 
-def run_command(command, cleanup=True):
+def run_command(command, cleanup=True, kill_on_timeout=True):
     """Runs a system command and returns its response."""
     if len(command) > 3 and command[0:3] == "cd ":
         try:
@@ -134,11 +134,13 @@ def run_command(command, cleanup=True):
     else:
         try:
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-            timer = Timer(5, lambda process: process.kill(), [process])
+            timer = None
 
             try:
-                # Kill process after 5 seconds (in case it hangs).
-                timer.start()
+                if kill_on_timeout:
+                    # Kill process after 5 seconds (in case it hangs).
+                    timer = Timer(5, lambda process: process.kill(), [process])
+                    timer.start()
                 stdout, stderr = process.communicate()
                 response = stdout + stderr
 
@@ -150,7 +152,8 @@ def run_command(command, cleanup=True):
                     else:
                         return response
             finally:
-                timer.cancel()
+                if timer:
+                    timer.cancel()
         except Exception as ex:
             print MESSAGE_ATTENTION + str(ex)
             return str(ex)
